@@ -1,0 +1,597 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Reusable Hardened Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isVerifiedAdminEmail() {
+      return isVerifiedEmail() && request.auth.token.email in ['najmudinneyazi40@gmail.com', 'najmuneyazi@gmail.com'];
+    }
+
+    function isAdmin() {
+      return isVerifiedAdminEmail() || (
+        isVerifiedEmail() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidCategory(cat) {
+      return cat in ['men', 'women', 'winter', 'summer', 'shoes', 'accessories'];
+    }
+
+    function isValidPaymentMethod(method) {
+      return method in ['cod', 'online', 'whatsapp'];
+    }
+
+    function isValidPaymentStatus(status) {
+      return status in ['pending', 'paid', 'failed'];
+    }
+
+    function isValidShippingStatus(status) {
+      return status in ['pending', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled'];
+    }
+
+    // --- Validation Blueprints ---
+    function isValidProduct(data) {
+      return data.keys().hasAll([
+          'nameDari', 'namePashto', 'descriptionDari', 'descriptionPashto',
+          'category', 'priceAfn', 'discountPriceAfn', 'stock',
+          'sizes', 'colors', 'imageUrl', 'isNew', 'isFeatured', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'nameDari', 'namePashto', 'descriptionDari', 'descriptionPashto',
+          'category', 'priceAfn', 'discountPriceAfn', 'stock',
+          'sizes', 'colors', 'imageUrl', 'isNew', 'isFeatured', 'createdAt', 'updatedAt'
+        ]) &&
+        data.nameDari is string && data.nameDari.size() >= 2 && data.nameDari.size() <= 140 &&
+        data.namePashto is string && data.namePashto.size() >= 2 && data.namePashto.size() <= 140 &&
+        data.descriptionDari is string && data.descriptionDari.size() >= 2 && data.descriptionDari.size() <= 1000 &&
+        data.descriptionPashto is string && data.descriptionPashto.size() >= 2 && data.descriptionPashto.size() <= 1000 &&
+        data.category is string && isValidCategory(data.category) &&
+        data.priceAfn is number && data.priceAfn > 0 && data.priceAfn <= 10000000 &&
+        data.discountPriceAfn is number && data.discountPriceAfn >= 0 && data.discountPriceAfn < data.priceAfn &&
+        data.stock is int && data.stock >= 0 && data.stock <= 100000 &&
+        data.sizes is list && data.sizes.size() >= 1 && data.sizes.size() <= 10 && data.sizes[0] is string &&
+        data.colors is list && data.colors.size() >= 1 && data.colors.size() <= 10 && data.colors[0] is string &&
+        data.imageUrl is string && data.imageUrl.size() >= 4 && data.imageUrl.size() <= 500 &&
+        data.isNew is bool &&
+        data.isFeatured is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOrderLoyaltyFields(data) {
+      return (!('pointsRedeemed' in data) && !('pointsDiscountAfn' in data) && !('pointsEarned' in data)) || (
+        data.keys().hasAll(['pointsRedeemed', 'pointsDiscountAfn', 'pointsEarned']) &&
+        data.pointsRedeemed is int && data.pointsRedeemed >= 0 && data.pointsRedeemed <= 100000 &&
+        data.pointsDiscountAfn is number && data.pointsDiscountAfn >= 0 &&
+        data.pointsDiscountAfn == data.pointsRedeemed * 5 &&
+        data.pointsDiscountAfn <= data.subtotalAfn &&
+        data.pointsEarned is int && data.pointsEarned >= 0 && data.pointsEarned <= 500000 &&
+        data.pointsEarned * 100 <= data.totalAfn &&
+        data.totalAfn == data.subtotalAfn + data.deliveryFeeAfn - data.pointsDiscountAfn
+      );
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll([
+          'orderCode', 'userId', 'customerName', 'phone', 'province', 'address',
+          'notes', 'items', 'subtotalAfn', 'deliveryFeeAfn', 'totalAfn',
+          'paymentMethod', 'paymentStatus', 'shippingStatus',
+          'trackingNumber', 'courierName', 'whatsappNotified', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderCode', 'userId', 'customerName', 'phone', 'province', 'address',
+          'notes', 'items', 'subtotalAfn', 'deliveryFeeAfn',
+          'pointsRedeemed', 'pointsDiscountAfn', 'pointsEarned',
+          'totalAfn', 'paymentMethod', 'paymentStatus', 'shippingStatus',
+          'trackingNumber', 'courierName', 'whatsappNotified', 'createdAt', 'updatedAt'
+        ]) &&
+        data.orderCode is string && data.orderCode.size() >= 4 && data.orderCode.size() <= 32 && data.orderCode.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 120 &&
+        data.phone is string && data.phone.size() >= 7 && data.phone.size() <= 30 &&
+        data.province is string && data.province.size() >= 2 && data.province.size() <= 80 &&
+        data.address is string && data.address.size() >= 4 && data.address.size() <= 300 &&
+        data.notes is string && data.notes.size() <= 400 &&
+        data.items is list && data.items.size() >= 1 && data.items.size() <= 30 && data.items[0] is map &&
+        data.subtotalAfn is number && data.subtotalAfn > 0 && data.subtotalAfn <= 50000000 &&
+        data.deliveryFeeAfn is number && data.deliveryFeeAfn >= 0 && data.deliveryFeeAfn <= 50000 &&
+        data.totalAfn is number && data.totalAfn > 0 && data.totalAfn <= 50050000 &&
+        isValidOrderLoyaltyFields(data) &&
+        data.paymentMethod is string && isValidPaymentMethod(data.paymentMethod) &&
+        data.paymentStatus is string && isValidPaymentStatus(data.paymentStatus) &&
+        data.shippingStatus is string && isValidShippingStatus(data.shippingStatus) &&
+        data.trackingNumber is string && data.trackingNumber.size() <= 64 &&
+        data.courierName is string && data.courierName.size() <= 80 &&
+        data.whatsappNotified is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOrderTracking(data) {
+      return data.keys().hasAll([
+          'orderId', 'orderCode', 'province', 'totalAfn', 'paymentMethod',
+          'shippingStatus', 'courierName', 'trackingNumber', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderId', 'orderCode', 'province', 'totalAfn', 'paymentMethod',
+          'shippingStatus', 'courierName', 'trackingNumber', 'updatedAt'
+        ]) &&
+        data.orderId is string && isValidId(data.orderId) &&
+        data.orderCode is string && data.orderCode.size() >= 4 && data.orderCode.size() <= 32 && data.orderCode.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.province is string && data.province.size() >= 2 && data.province.size() <= 80 &&
+        data.totalAfn is number && data.totalAfn > 0 &&
+        data.paymentMethod is string && isValidPaymentMethod(data.paymentMethod) &&
+        data.shippingStatus is string && isValidShippingStatus(data.shippingStatus) &&
+        data.courierName is string && data.courierName.size() <= 80 &&
+        data.trackingNumber is string && data.trackingNumber.size() <= 64 &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSupportThread(data) {
+      return data.keys().hasAll([
+          'customerUid', 'customerName', 'customerPhone', 'channel', 'status',
+          'lastMessage', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'customerUid', 'customerName', 'customerPhone', 'channel', 'status',
+          'lastMessage', 'createdAt', 'updatedAt'
+        ]) &&
+        data.customerUid is string && data.customerUid.size() >= 1 && data.customerUid.size() <= 128 &&
+        data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120 &&
+        data.customerPhone is string && data.customerPhone.size() <= 30 &&
+        data.channel is string && data.channel in ['web', 'whatsapp'] &&
+        data.status is string && data.status in ['open', 'resolved'] &&
+        data.lastMessage is string && data.lastMessage.size() <= 500 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSupportMessage(data) {
+      return data.keys().hasAll([
+          'customerUid', 'senderRole', 'senderName', 'text', 'channel', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'customerUid', 'senderRole', 'senderName', 'text', 'channel', 'createdAt'
+        ]) &&
+        data.customerUid is string && data.customerUid.size() >= 1 && data.customerUid.size() <= 128 &&
+        data.senderRole is string && data.senderRole in ['customer', 'operator', 'system'] &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 100 &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 1500 &&
+        data.channel is string && data.channel in ['web', 'whatsapp'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidWhatsAppLog(data) {
+      return data.keys().hasAll([
+          'orderCode', 'recipientPhone', 'templateName', 'messagePreview',
+          'deliveryMode', 'status', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderCode', 'recipientPhone', 'templateName', 'messagePreview',
+          'deliveryMode', 'status', 'createdAt'
+        ]) &&
+        data.orderCode is string && data.orderCode.size() >= 2 && data.orderCode.size() <= 32 &&
+        data.recipientPhone is string && data.recipientPhone.size() >= 7 && data.recipientPhone.size() <= 30 &&
+        data.templateName is string && data.templateName.size() >= 2 && data.templateName.size() <= 80 &&
+        data.messagePreview is string && data.messagePreview.size() >= 2 && data.messagePreview.size() <= 1500 &&
+        data.deliveryMode is string && data.deliveryMode in ['cloud_api', 'wa_me_link'] &&
+        data.status is string && data.status in ['sent', 'queued', 'failed'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidAdminUser(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['email', 'role', 'createdAt']) &&
+        data.email is string && data.email.size() >= 5 && data.email.size() <= 180 &&
+        data.role == 'admin' &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+          'fullName', 'email', 'phone', 'province', 'address',
+          'preferredLanguage', 'role', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'fullName', 'email', 'phone', 'province', 'address',
+          'preferredLanguage', 'role', 'points', 'lastOrderId', 'createdAt', 'updatedAt'
+        ]) &&
+        data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120 &&
+        data.email is string && data.email.size() >= 5 && data.email.size() <= 180 &&
+        data.phone is string && data.phone.size() <= 30 &&
+        data.province is string && data.province.size() <= 80 &&
+        data.address is string && data.address.size() <= 300 &&
+        data.preferredLanguage is string && data.preferredLanguage in ['fa', 'ps'] &&
+        data.role == 'customer' &&
+        (!('points' in data) || (data.points is int && data.points >= 0 && data.points <= 10000000)) &&
+        (!('lastOrderId' in data) || (data.lastOrderId is string && data.lastOrderId.size() <= 128)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidLoyaltyOrderSync(prevData, nextData, orderData) {
+      return orderData.userId == request.auth.uid &&
+        orderData.keys().hasAll(['pointsRedeemed', 'pointsDiscountAfn', 'pointsEarned']) &&
+        orderData.pointsRedeemed is int &&
+        orderData.pointsRedeemed >= 0 &&
+        orderData.pointsRedeemed <= prevData.points &&
+        orderData.pointsEarned is int &&
+        orderData.pointsEarned >= 0 &&
+        orderData.pointsEarned * 100 <= orderData.totalAfn &&
+        nextData.points == prevData.points - orderData.pointsRedeemed + orderData.pointsEarned;
+    }
+
+    function isValidWishlistItem(data) {
+      return data.keys().hasAll([
+          'userId', 'productId', 'nameDari', 'namePashto',
+          'category', 'priceAfn', 'discountPriceAfn', 'imageUrl', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'productId', 'nameDari', 'namePashto',
+          'category', 'priceAfn', 'discountPriceAfn', 'imageUrl', 'createdAt'
+        ]) &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.productId is string && isValidId(data.productId) &&
+        data.nameDari is string && data.nameDari.size() >= 1 && data.nameDari.size() <= 140 &&
+        data.namePashto is string && data.namePashto.size() >= 1 && data.namePashto.size() <= 140 &&
+        data.category is string && isValidCategory(data.category) &&
+        data.priceAfn is number && data.priceAfn > 0 && data.priceAfn <= 10000000 &&
+        data.discountPriceAfn is number && data.discountPriceAfn >= 0 && data.discountPriceAfn < data.priceAfn &&
+        data.imageUrl is string && data.imageUrl.size() >= 4 && data.imageUrl.size() <= 500 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll([
+          'productId', 'userId', 'authorName', 'rating', 'comment', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'productId', 'userId', 'authorName', 'rating', 'comment', 'createdAt'
+        ]) &&
+        data.productId is string && isValidId(data.productId) &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 100 &&
+        data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+        data.comment is string && data.comment.size() >= 2 && data.comment.size() <= 600 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidBackInStockRequest(data) {
+      return data.keys().hasAll([
+          'productId', 'productNameDari', 'email', 'userId', 'status', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'productId', 'productNameDari', 'email', 'userId', 'status', 'createdAt'
+        ]) &&
+        data.productId is string && isValidId(data.productId) &&
+        data.productNameDari is string && data.productNameDari.size() >= 1 && data.productNameDari.size() <= 140 &&
+        data.email is string && data.email.size() >= 5 && data.email.size() <= 180 && data.email.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$') &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.status is string && data.status in ['pending', 'notified'] &&
+        data.createdAt is timestamp;
+    }
+
+    // --- Connection Probe ---
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // --- Products Catalog ---
+    match /products/{productId} {
+      allow get: if isValidId(productId);
+      allow list: if true;
+      allow create: if isAdmin() &&
+        isValidId(productId) &&
+        isValidProduct(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isAdmin() &&
+        isValidId(productId) &&
+        isValidProduct(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'nameDari', 'namePashto', 'descriptionDari', 'descriptionPashto',
+          'category', 'priceAfn', 'discountPriceAfn', 'stock',
+          'sizes', 'colors', 'imageUrl', 'isNew', 'isFeatured', 'updatedAt'
+        ]);
+      allow delete: if isAdmin() && isValidId(productId);
+    }
+
+    // --- Orders (PII Isolated) ---
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId) && (
+        isAdmin() ||
+        (isSignedIn() && existing().userId == request.auth.uid)
+      );
+      allow list: if isVerifiedAdminEmail() || (
+        isSignedIn() && resource.data.userId == request.auth.uid
+      );
+      allow create: if isValidId(orderId) &&
+        isValidOrder(incoming()) &&
+        incoming().keys().hasAll(['pointsRedeemed', 'pointsDiscountAfn', 'pointsEarned']) &&
+        incoming().shippingStatus == 'pending' &&
+        incoming().whatsappNotified == false &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          (
+            !isSignedIn() &&
+            incoming().userId == 'guest' &&
+            incoming().pointsRedeemed == 0 &&
+            incoming().pointsDiscountAfn == 0 &&
+            incoming().pointsEarned == 0
+          ) ||
+          (
+            isSignedIn() &&
+            incoming().userId == request.auth.uid &&
+            (
+              incoming().pointsRedeemed == 0 ||
+              (
+                exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastOrderId == orderId
+              )
+            )
+          )
+        ) &&
+        existsAfter(/databases/$(database)/documents/order_tracking/$(incoming().orderCode));
+      allow update: if isAdmin() &&
+        isValidId(orderId) &&
+        isValidOrder(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().userId == existing().userId &&
+        incoming().orderCode == existing().orderCode &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'paymentStatus', 'shippingStatus', 'trackingNumber',
+          'courierName', 'whatsappNotified', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // --- Order Tracking (Zero PII, Exact Lookup Only) ---
+    match /order_tracking/{orderCode} {
+      allow get: if isValidId(orderCode);
+      allow list: if false;
+      allow create: if isValidId(orderCode) &&
+        isValidOrderTracking(incoming()) &&
+        incoming().orderCode == orderCode &&
+        incoming().shippingStatus == 'pending' &&
+        incoming().updatedAt == request.time &&
+        existsAfter(/databases/$(database)/documents/orders/$(incoming().orderId));
+      allow update: if isAdmin() &&
+        isValidId(orderCode) &&
+        isValidOrderTracking(incoming()) &&
+        incoming().orderId == existing().orderId &&
+        incoming().orderCode == existing().orderCode &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'shippingStatus', 'courierName', 'trackingNumber', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // --- 24/7 Support Threads ---
+    match /support_threads/{threadId} {
+      allow get: if isValidId(threadId) && (
+        isAdmin() ||
+        (isSignedIn() && existing().customerUid == request.auth.uid)
+      );
+      allow list: if isVerifiedAdminEmail() || (
+        isSignedIn() && resource.data.customerUid == request.auth.uid
+      );
+      allow create: if isValidId(threadId) &&
+        isValidSupportThread(incoming()) &&
+        incoming().status == 'open' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        ((isSignedIn() && incoming().customerUid == request.auth.uid) || (!isSignedIn() && incoming().customerUid == 'guest'));
+      allow update: if isValidId(threadId) &&
+        isValidSupportThread(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().customerUid == existing().customerUid &&
+        incoming().updatedAt == request.time &&
+        (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lastMessage', 'channel', 'updatedAt'])) ||
+          (isSignedIn() && existing().customerUid == request.auth.uid && existing().status != 'resolved' && incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'updatedAt']))
+        );
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get: if isValidId(threadId) && isValidId(messageId) && (
+          isAdmin() ||
+          (isSignedIn() && existing().customerUid == request.auth.uid)
+        );
+        allow list: if isVerifiedAdminEmail() || (
+          isSignedIn() && resource.data.customerUid == request.auth.uid
+        );
+        allow create: if isValidId(threadId) && isValidId(messageId) &&
+          isValidSupportMessage(incoming()) &&
+          incoming().createdAt == request.time &&
+          (
+            isAdmin() ||
+            (
+              incoming().senderRole == 'customer' &&
+              exists(/databases/$(database)/documents/support_threads/$(threadId)) &&
+              ((isSignedIn() && incoming().customerUid == request.auth.uid) || (!isSignedIn() && incoming().customerUid == 'guest'))
+            )
+          );
+        allow update, delete: if false;
+      }
+    }
+
+    // --- WhatsApp Notification Logs ---
+    match /whatsapp_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isVerifiedAdminEmail();
+      allow create: if isAdmin() &&
+        isValidId(logId) &&
+        isValidWhatsAppLog(incoming()) &&
+        incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // --- Admin Registry ---
+    match /admins/{uid} {
+      allow get: if isSignedIn() && isValidId(uid) && (request.auth.uid == uid || isAdmin());
+      allow list: if isVerifiedAdminEmail();
+      allow create: if isVerifiedAdminEmail() && isValidId(uid) && isValidAdminUser(incoming()) && incoming().createdAt == request.time;
+      allow update: if isVerifiedAdminEmail() && isValidId(uid) && isValidAdminUser(incoming()) && incoming().createdAt == existing().createdAt && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'role']);
+      allow delete: if isVerifiedAdminEmail() && isValidId(uid);
+    }
+
+    // --- Registered Customer Profiles & Loyalty Points (PII Isolated) ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isVerifiedAdminEmail();
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        isValidUserProfile(incoming()) &&
+        incoming().keys().hasAll(['points', 'lastOrderId']) &&
+        incoming().role == 'customer' &&
+        incoming().points == 0 &&
+        incoming().lastOrderId == '' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().role == existing().role &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          (
+            isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'fullName', 'phone', 'province', 'address', 'preferredLanguage', 'points', 'lastOrderId', 'updatedAt'
+            ])
+          ) ||
+          (
+            request.auth.uid == userId &&
+            (
+              (
+                ('points' in existing()) &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'fullName', 'phone', 'province', 'address', 'preferredLanguage', 'updatedAt'
+                ])
+              ) ||
+              (
+                !('points' in existing()) &&
+                incoming().points == 0 &&
+                incoming().lastOrderId == '' &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'fullName', 'phone', 'province', 'address', 'preferredLanguage', 'points', 'lastOrderId', 'updatedAt'
+                ])
+              ) ||
+              (
+                ('points' in existing()) &&
+                incoming().keys().hasAll(['points', 'lastOrderId']) &&
+                isValidId(incoming().lastOrderId) &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'points', 'lastOrderId', 'updatedAt'
+                ]) &&
+                !exists(/databases/$(database)/documents/orders/$(incoming().lastOrderId)) &&
+                existsAfter(/databases/$(database)/documents/orders/$(incoming().lastOrderId)) &&
+                isValidLoyaltyOrderSync(
+                  existing(),
+                  incoming(),
+                  getAfter(/databases/$(database)/documents/orders/$(incoming().lastOrderId)).data
+                )
+              )
+            )
+          )
+        );
+      allow delete: if false;
+
+      match /wishlist/{productId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(productId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+        allow create: if isSignedIn() &&
+          isValidId(userId) &&
+          isValidId(productId) &&
+          request.auth.uid == userId &&
+          isValidWishlistItem(incoming()) &&
+          incoming().userId == request.auth.uid &&
+          incoming().productId == productId &&
+          incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(productId) && request.auth.uid == userId;
+      }
+    }
+
+    // --- Product Reviews & Star Ratings ---
+    match /reviews/{reviewId} {
+      allow get: if isValidId(reviewId);
+      allow list: if isValidId(resource.data.productId);
+      allow create: if isSignedIn() &&
+        isValidId(reviewId) &&
+        isValidReview(incoming()) &&
+        incoming().userId == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(reviewId) && (
+        isAdmin() ||
+        (isSignedIn() && existing().userId == request.auth.uid)
+      );
+    }
+
+    // --- Back-in-Stock Email Notification Requests (PII Isolated) ---
+    match /backInStockRequests/{requestId} {
+      allow get: if isValidId(requestId) && (
+        isAdmin() ||
+        (isSignedIn() && existing().userId == request.auth.uid)
+      );
+      allow list: if isVerifiedAdminEmail() || (
+        isSignedIn() && resource.data.userId == request.auth.uid
+      );
+      allow create: if isValidId(requestId) &&
+        isValidBackInStockRequest(incoming()) &&
+        incoming().status == 'pending' &&
+        incoming().createdAt == request.time &&
+        (
+          (isSignedIn() && incoming().userId == request.auth.uid) ||
+          (!isSignedIn() && incoming().userId == 'guest')
+        );
+      allow update: if isAdmin() &&
+        isValidId(requestId) &&
+        isValidBackInStockRequest(incoming()) &&
+        incoming().productId == existing().productId &&
+        incoming().productNameDari == existing().productNameDari &&
+        incoming().email == existing().email &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isValidId(requestId) && (
+        isAdmin() ||
+        (isSignedIn() && existing().userId == request.auth.uid)
+      );
+    }
+  }
+}

@@ -1,0 +1,361 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Luxury fashion garment, footwear, or accessory sold by Radmanesh Fashion.",
+      "type": "object",
+      "properties": {
+        "nameDari": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "namePashto": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "descriptionDari": { "type": "string", "minLength": 2, "maxLength": 1000 },
+        "descriptionPashto": { "type": "string", "minLength": 2, "maxLength": 1000 },
+        "category": {
+          "type": "string",
+          "enum": ["men", "women", "winter", "summer", "shoes", "accessories"]
+        },
+        "priceAfn": { "type": "number" },
+        "discountPriceAfn": { "type": "number" },
+        "stock": { "type": "integer" },
+        "sizes": { "type": "array" },
+        "colors": { "type": "array" },
+        "imageUrl": { "type": "string", "minLength": 4, "maxLength": 500 },
+        "isNew": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "nameDari",
+        "namePashto",
+        "descriptionDari",
+        "descriptionPashto",
+        "category",
+        "priceAfn",
+        "discountPriceAfn",
+        "stock",
+        "sizes",
+        "colors",
+        "imageUrl",
+        "isNew",
+        "isFeatured",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order record with delivery details across Afghanistan provinces.",
+      "type": "object",
+      "properties": {
+        "orderCode": { "type": "string", "minLength": 4, "maxLength": 32, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "customerName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "phone": { "type": "string", "minLength": 7, "maxLength": 30 },
+        "province": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "address": { "type": "string", "minLength": 4, "maxLength": 300 },
+        "notes": { "type": "string", "maxLength": 400 },
+        "items": { "type": "array" },
+        "subtotalAfn": { "type": "number" },
+        "deliveryFeeAfn": { "type": "number" },
+        "pointsRedeemed": { "type": "integer" },
+        "pointsDiscountAfn": { "type": "number" },
+        "pointsEarned": { "type": "integer" },
+        "totalAfn": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cod", "online", "whatsapp"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "paid", "failed"] },
+        "shippingStatus": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "packed", "shipped", "delivered", "cancelled"]
+        },
+        "trackingNumber": { "type": "string", "maxLength": 64 },
+        "courierName": { "type": "string", "maxLength": 80 },
+        "whatsappNotified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "orderCode",
+        "userId",
+        "customerName",
+        "phone",
+        "province",
+        "address",
+        "notes",
+        "items",
+        "subtotalAfn",
+        "deliveryFeeAfn",
+        "pointsRedeemed",
+        "pointsDiscountAfn",
+        "pointsEarned",
+        "totalAfn",
+        "paymentMethod",
+        "paymentStatus",
+        "shippingStatus",
+        "trackingNumber",
+        "courierName",
+        "whatsappNotified",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OrderTracking": {
+      "title": "OrderTracking",
+      "description": "Zero-PII public tracking status card keyed by orderCode.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "minLength": 4, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "orderCode": { "type": "string", "minLength": 4, "maxLength": 32, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "province": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "totalAfn": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cod", "online", "whatsapp"] },
+        "shippingStatus": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "packed", "shipped", "delivered", "cancelled"]
+        },
+        "courierName": { "type": "string", "maxLength": 80 },
+        "trackingNumber": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "orderId",
+        "orderCode",
+        "province",
+        "totalAfn",
+        "paymentMethod",
+        "shippingStatus",
+        "courierName",
+        "trackingNumber",
+        "updatedAt"
+      ]
+    },
+    "SupportThread": {
+      "title": "SupportThread",
+      "description": "24/7 customer support and WhatsApp conversation thread.",
+      "type": "object",
+      "properties": {
+        "customerUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "channel": { "type": "string", "enum": ["web", "whatsapp"] },
+        "status": { "type": "string", "enum": ["open", "resolved"] },
+        "lastMessage": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "customerUid",
+        "customerName",
+        "customerPhone",
+        "channel",
+        "status",
+        "lastMessage",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SupportMessage": {
+      "title": "SupportMessage",
+      "description": "Individual message inside a support thread.",
+      "type": "object",
+      "properties": {
+        "customerUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "senderRole": { "type": "string", "enum": ["customer", "operator", "system"] },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1500 },
+        "channel": { "type": "string", "enum": ["web", "whatsapp"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "customerUid",
+        "senderRole",
+        "senderName",
+        "text",
+        "channel",
+        "createdAt"
+      ]
+    },
+    "WhatsAppLog": {
+      "title": "WhatsAppLog",
+      "description": "Audit log of automated and operator WhatsApp notifications.",
+      "type": "object",
+      "properties": {
+        "orderCode": { "type": "string", "minLength": 2, "maxLength": 32 },
+        "recipientPhone": { "type": "string", "minLength": 7, "maxLength": 30 },
+        "templateName": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "messagePreview": { "type": "string", "minLength": 2, "maxLength": 1500 },
+        "deliveryMode": { "type": "string", "enum": ["cloud_api", "wa_me_link"] },
+        "status": { "type": "string", "enum": ["sent", "queued", "failed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "orderCode",
+        "recipientPhone",
+        "templateName",
+        "messagePreview",
+        "deliveryMode",
+        "status",
+        "createdAt"
+      ]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Store administrator record.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "minLength": 5, "maxLength": 180 },
+        "role": { "type": "string", "enum": ["admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Registered customer profile with PII isolated to owner and admin.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "email": { "type": "string", "minLength": 5, "maxLength": 180 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "province": { "type": "string", "maxLength": 80 },
+        "address": { "type": "string", "maxLength": 300 },
+        "preferredLanguage": { "type": "string", "enum": ["fa", "ps"] },
+        "role": { "type": "string", "enum": ["customer"] },
+        "points": { "type": "integer" },
+        "lastOrderId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "fullName",
+        "email",
+        "phone",
+        "province",
+        "address",
+        "preferredLanguage",
+        "role",
+        "points",
+        "lastOrderId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WishlistItem": {
+      "title": "WishlistItem",
+      "description": "Favorite product saved by an authenticated customer.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "productId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "nameDari": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "namePashto": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "category": {
+          "type": "string",
+          "enum": ["men", "women", "winter", "summer", "shoes", "accessories"]
+        },
+        "priceAfn": { "type": "number" },
+        "discountPriceAfn": { "type": "number" },
+        "imageUrl": { "type": "string", "minLength": 4, "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "productId",
+        "nameDari",
+        "namePashto",
+        "category",
+        "priceAfn",
+        "discountPriceAfn",
+        "imageUrl",
+        "createdAt"
+      ]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Customer rating and written review linked to a product ID.",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "authorName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "rating": { "type": "integer" },
+        "comment": { "type": "string", "minLength": 2, "maxLength": 600 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "productId",
+        "userId",
+        "authorName",
+        "rating",
+        "comment",
+        "createdAt"
+      ]
+    },
+    "BackInStockRequest": {
+      "title": "BackInStockRequest",
+      "description": "Customer email notification request when an out-of-stock product becomes available again.",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "productNameDari": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "email": { "type": "string", "minLength": 5, "maxLength": 180, "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": { "type": "string", "enum": ["pending", "notified"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "productId",
+        "productNameDari",
+        "email",
+        "userId",
+        "status",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Public storefront product catalog; admin-only writes."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Full customer orders with PII; owner and admin read only."
+    },
+    "/order_tracking/{orderCode}": {
+      "schema": { "$ref": "#/entities/OrderTracking" },
+      "description": "Zero-PII order status lookup keyed by orderCode; no list queries."
+    },
+    "/support_threads/{threadId}": {
+      "schema": { "$ref": "#/entities/SupportThread" },
+      "description": "24/7 online and WhatsApp support conversation threads."
+    },
+    "/support_threads/{threadId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/SupportMessage" },
+      "description": "Messages belonging to a support thread."
+    },
+    "/whatsapp_logs/{logId}": {
+      "schema": { "$ref": "#/entities/WhatsAppLog" },
+      "description": "Admin-only WhatsApp automated tracking notification logs."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Trusted admin UID registry."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Customer accounts with owner-only and admin-only PII isolation."
+    },
+    "/users/{userId}/wishlist/{productId}": {
+      "schema": { "$ref": "#/entities/WishlistItem" },
+      "description": "Customer favorite wishlist items persisted in Firestore."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Customer product reviews and star ratings linked to productId."
+    },
+    "/backInStockRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/BackInStockRequest" },
+      "description": "Back-in-stock email alert requests linked to out-of-stock product IDs; PII isolated to requester and admin."
+    }
+  }
+}

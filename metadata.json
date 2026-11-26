@@ -1,0 +1,6 @@
+{
+  "name": "Radmanesh Fashion | رادمنش فیشن",
+  "description": "Luxury fashion store for Afghanistan offering men's and women's apparel, winter and summer collections, footwear, and accessories in AFN with Dari & Pashto support, nationwide delivery, WhatsApp Business integration, and an admin management console.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
